@@ -300,6 +300,37 @@ def main_pipeline(input_csv: str, out_jsonl: str, do_deid=True, label_csv: Optio
     out_df2.to_csv("final_extractions_with_preds.csv", index=False)
     logger.info("Exported final_extractions_with_preds.csv")
 
+#FastAPI integration
+def run_pipeline_on_reports(reports: list[str], deid: bool):
+    import pandas as pd, uuid, os, json, subprocess
+
+    # Create the required CSV format
+    temp_name = f"temp_{uuid.uuid4().hex}.csv"
+    df = pd.DataFrame({
+        "report_id": range(len(reports)),       # auto-generate IDs
+        "report_text": reports                  # text column as expected
+    })
+    df.to_csv(temp_name, index=False)
+
+    out_name = f"temp_{uuid.uuid4().hex}.jsonl"
+    script_path = os.path.join(os.path.dirname(__file__), "rad_nlp_pipeline.py")
+
+    args = ["python", script_path, "--input_csv", temp_name, "--out_jsonl", out_name]
+    if deid:
+        args.append("--deid")
+
+    subprocess.run(args, check=True)
+
+    results = []
+    with open(out_name, "r") as f:
+        for line in f:
+            results.append(json.loads(line))
+
+    os.remove(temp_name)
+    os.remove(out_name)
+    return results
+
+
 if __name__ == "__main__":
     import argparse
     p = argparse.ArgumentParser()
