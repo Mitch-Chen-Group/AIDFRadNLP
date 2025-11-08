@@ -1,0 +1,6 @@
+pandas
+numpy
+tqdm
+openai>=1.0.0      # or the OpenAI SDK used in your environment; adjust import accordingly
+scikit-learn
+tenacity

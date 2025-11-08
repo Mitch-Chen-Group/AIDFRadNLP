@@ -1,0 +1,7 @@
+{
+  "nodule_present": "true" | "false",
+  "largest_nodule_size_mm": number | null,
+  "malignancy_suspected": "true" | "false" | "uncertain",
+  "follow_up_recommended": "true" | "false",
+  "evidence_snippet": "string (exact supporting text)"
+}
