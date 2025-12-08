@@ -1,0 +1,81 @@
+{
+  "lesion_characteristics": {
+    "mass": {
+      "present": false,
+      "description": "",
+      "margins": {
+        "spiculated": false,
+        "irregular": false,
+        "smooth": false,
+        "lobulated": false
+      },
+      "calcification": {
+        "present": false,
+        "pattern": ""
+      }
+    },
+    "nodule": {
+      "present": false,
+      "description": "",
+      "size_mm": null,
+      "calcification": {
+        "present": false,
+        "pattern": ""
+      }
+    },
+    "opacity": {
+      "present": false,
+      "type": "",
+      "distribution": ""
+    }
+  },
+
+  "location": {
+    "lung_side": "",           
+    "lung_zone": "",           
+    "lobe": "",                
+    "segment": "",             
+    "central_or_peripheral": ""
+  },
+
+  "suspicious_features": {
+    "spiculation": false,
+    "irregular_borders": false,
+    "lobulated_contour": false,
+    "non_calcified": false,
+    "cavitation": false,
+    "rapid_growth_or_interval_change": false,
+    "associated_atelectasis": false
+  },
+
+  "lymph_nodes": {
+    "hilar_enlargement": false,
+    "mediastinal_adenopathy": false,
+    "description": ""
+  },
+
+  "pleura": {
+    "effusion": false,
+    "thickening": false,
+    "description": ""
+  },
+
+  "associated_findings": {
+    "bone_erosion_or_destruction": false,
+    "elevation_of_hemidiaphragm": false,
+    "mediastinal_shift": false
+  },
+
+  "impression_language": {
+    "phrases": [],
+    "suspicion_level": "low | indeterminate | suspicious | highly_suspicious",
+    "recommended_follow_up": [
+      "none",
+      "CT chest",
+      "PET-CT",
+      "biopsy",
+      "oncology referral",
+      "pulmonology referral"
+    ]
+  }
+}
