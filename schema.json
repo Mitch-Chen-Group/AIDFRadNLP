@@ -1,7 +1,44 @@
 {
-  "nodule_present": "true" | "false",
-  "largest_nodule_size_mm": number | null,
-  "malignancy_suspected": "true" | "false" | "uncertain",
-  "follow_up_recommended": "true" | "false",
-  "evidence_snippet": "string (exact supporting text)"
+  "task_description": "Radiology report information extraction",
+  "instructions": [
+    "Extract only the requested fields from the report text.",
+    "Do NOT add extra fields or invent facts.",
+    "Return ONLY valid JSON that matches the schema exactly."
+  ],
+  "fields": {
+    "nodule_present": {
+      "type": "boolean"
+    },
+    "largest_nodule_size_mm": {
+      "type": "number_or_null"
+    },
+    "malignancy_suspected": {
+      "type": "enum",
+      "values": ["true", "false", "uncertain"]
+    },
+    "follow_up_recommended": {
+      "type": "boolean"
+    },
+    "mass_present": {
+      "type": "boolean"
+    },
+    "mediastinal_mass_present": {
+      "type": "boolean"
+    },
+    "lymphadenopathy_present": {
+      "type": "boolean"
+    },
+    "lung_present": {
+      "type": "boolean"
+    },
+    "evidence_snippet": {
+      "type": "string"
+    }
+  },
+  "extra_notes": [
+    "If multiple nodules are mentioned, use the largest.",
+    "If no numeric size is given, return null."
+  ]
 }
+
+

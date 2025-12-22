@@ -8,12 +8,7 @@ End-to-end pipeline:
 - apply classifier to full dataset
 - export results + simple QA metrics
 
-Usage example: export OPENAI_API_KEY=
-
-echo $OPENAI_API_KEY
-
-python rad_nlp_pipeline.py --input_csv reports.csv --schema schema.json --out_csv gpt_output.csv  --deid
-
+Usage example: python rad_nlp_pipeline.py --input_csv reports.csv --schema schema.json -out_jsonl gpt_extractions.jsonl --deid
 """
 
 import os
@@ -34,7 +29,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report
 from sklearn.multiclass import OneVsRestClassifier
-from sklearn.multioutput import MultiOutputClassifier
 
 # OpenAI
 from openai import OpenAI
@@ -150,6 +144,7 @@ def flatten_record(record: Dict[str, Any]) -> Dict[str, Any]:
         "report_text": record["report_text"]
     }
     extraction = record.get("extraction", {})
+    # Each field becomes its own column
     for k, v in extraction.items():
         if isinstance(v, str) and v.lower() in {"true", "false"}:
             v = v.lower() == "true"
@@ -159,9 +154,14 @@ def flatten_record(record: Dict[str, Any]) -> Dict[str, Any]:
 def write_csv(out_path: str, records: List[Dict[str, Any]]):
     if not records:
         return
+    # Flatten all records
     rows = [flatten_record(r) for r in records]
-    extraction_keys = set().union(*(r.keys() for r in rows)) - {"report_id", "report_text"}
-    columns = ["report_id", "report_text"] + sorted(extraction_keys)
+    # Collect all column names
+    all_keys = set()
+    for r in rows:
+        all_keys.update(r.keys())
+    columns = ["report_id", "report_text"] + sorted(all_keys - {"report_id", "report_text"})
+    # Build DataFrame and save
     df = pd.DataFrame(rows, columns=columns)
     df.to_csv(out_path, index=False, quoting=csv.QUOTE_ALL)
 
@@ -217,11 +217,10 @@ def run_pipeline(input_csv: str, schema_path: str, out_csv: str, deid: bool):
         Y = Y.dropna(axis=1, how="all")
         if not Y.empty:
             Y = Y.fillna(0).astype(int)
-            Y = Y.clip(0, 1)  # enforce binary
             Y_array = Y.to_numpy(dtype=int)
 
             # Skip classifier if dataset too small
-            if Y_array.shape[0] < 1:
+            if Y_array.shape[0] < 5:
                 logger.warning(
                     f"Only {Y_array.shape[0]} samples available. Skipping classifier training."
                 )

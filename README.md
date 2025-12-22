@@ -1,11 +1,11 @@
 # AIDFRadNLP
 End-to-end pipeline for batch processing radiology reports using OpenAI API
 
-Tested on Windows 11
+Tested on Windows 11, Ubuntu 20.04 and OSX
 
-Mitch Chen v1.0 
+Mitch Chen v1.1
 
-Updated 2025.11.08
+Updated 2025.12.22
 License: CC-A-NC-SA 4.0
 
 ## Usage instructions
@@ -23,16 +23,16 @@ conda activate AIDFRadNLP
 pip install -r requirements.txt
 ```
 ### 3. Save reports as reports.csv (1 line per report, template provided)
-### 4. Update schema.json based on keywords and criteria
-### 5. Set API key in rad_nlp_pipeline.py (Found on [https://platform.openai.com/account/api-keys])
-### 6. Set model to use
+### 4. Update schema.json based on keywords, output type (boolean if true or false) and criteria 
+### 5. Set API key export OPENAI_API_KEY= (Found on [https://platform.openai.com/account/api-keys]); check  echo $OPENAI_API_KEY
+### 6. Set model to use in rad_nlp_pipeline.py (MODEL_LLM = "gpt-4o")
 ### 7. Run pipeline 
 
 ```bash
-python rad_nlp_pipeline.py --input_csv reports.csv --out_jsonl gpt_out.jsonl --deid
+python rad_nlp_pipeline.py --input_csv reports.csv --schema schema.json --out_csv gpt_output.csv  --deid
 ```
 
-Output saved as final_extractions_with_preds.csv in root folder
+Output saved as gpt_output.csv in root folder. Open with Excel with "delimited" enabled 
 
 ## Method 2: API Server (Experimental)
 

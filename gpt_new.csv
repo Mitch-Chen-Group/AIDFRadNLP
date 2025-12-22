@@ -1,0 +1,4 @@
+"report_id","report_text","evidence_snippet","follow_up_recommended","largest_nodule_size_mm","lymphadenopathy_present","malignancy_suspected","mass_present","mediastinal_mass_present","nodule_present"
+"1","Patient presents with a 0.8 cm nodule in the right lung.                                         ","Patient presents with a 0.8 cm nodule in the right lung.","False","8.0","False","uncertain","False","False","True"
+"2","No lung nodules seen. Routine follow-up recommended.                                             ","No lung nodules seen. Routine follow-up recommended.","True","","False","False","False","False","False"
+"3","Multiple nodules, largest 1.2 cm. Malignancy suspected.                                          ","Multiple nodules, largest 1.2 cm. Malignancy suspected.","False","12.0","False","True","False","False","True"

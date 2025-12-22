@@ -8,14 +8,8 @@ End-to-end pipeline:
 - apply classifier to full dataset
 - export results + simple QA metrics
 
-Usage example: export OPENAI_API_KEY=
-
-echo $OPENAI_API_KEY
-
-python rad_nlp_pipeline.py --input_csv reports.csv --schema schema.json --out_csv gpt_output.csv  --deid
-
+Usage example: python rad_nlp_pipeline.py --input_csv reports.csv --schema schema.json -out_jsonl gpt_extractions.jsonl --deid
 """
-
 import os
 import csv
 import time
@@ -34,7 +28,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report
 from sklearn.multiclass import OneVsRestClassifier
-from sklearn.multioutput import MultiOutputClassifier
 
 # OpenAI
 from openai import OpenAI
@@ -217,11 +210,10 @@ def run_pipeline(input_csv: str, schema_path: str, out_csv: str, deid: bool):
         Y = Y.dropna(axis=1, how="all")
         if not Y.empty:
             Y = Y.fillna(0).astype(int)
-            Y = Y.clip(0, 1)  # enforce binary
             Y_array = Y.to_numpy(dtype=int)
 
             # Skip classifier if dataset too small
-            if Y_array.shape[0] < 1:
+            if Y_array.shape[0] < 5:
                 logger.warning(
                     f"Only {Y_array.shape[0]} samples available. Skipping classifier training."
                 )
