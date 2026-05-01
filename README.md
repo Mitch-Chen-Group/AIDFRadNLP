@@ -3,9 +3,9 @@ End-to-end pipeline for batch processing radiology reports using OpenAI API
 
 Tested on Windows 11, Ubuntu 20.04 and OSX
 
-Mitch Chen v1.1
+Mitch Chen v1.2
 
-Updated 2025.12.22
+Updated 2026.05.01
 License: CC-A-NC-SA 4.0
 
 ## Usage instructions
@@ -38,7 +38,8 @@ Check key setup using:
 echo $OPENAI_API_KEY
 ```
 
-### 6. Set model to use in rad_nlp_pipeline.py (MODEL_LLM = "gpt-4o")
+### 6. Choose model to use: rad_nlp_pipeline_v2.py (MODEL_LLM = "gpt-5.1")
+rad_nlp_pipeline.py (MODEL_LLM = "gpt-4o")
 
 ### 7. Run pipeline 
 
