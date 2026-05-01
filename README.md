@@ -21,6 +21,7 @@ git clone https://github.com/Mitch-Chen-Group/AIDFRadNLP.git
 conda create -n AIDFRadNLP python=3.10
 conda activate AIDFRadNLP
 pip install -r requirements.txt
+pip install --upgrade openai
 ```
 
 ### 3. Save reports as reports.csv (1 line per report, template provided)
