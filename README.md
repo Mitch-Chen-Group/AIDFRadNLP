@@ -32,7 +32,7 @@ pip install --upgrade openai
 ```bash
 export OPENAI_API_KEY= xxx
 ```
- (Found on [https://platform.openai.com/account/api-keys]).
+ (Found at [https://platform.openai.com/account/api-keys]).
  
 Check key setup using:
 ```bash
