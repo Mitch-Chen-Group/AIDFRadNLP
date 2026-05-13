@@ -1,37 +1,29 @@
 import os
 import csv
-import time
 import json
 import re
 import asyncio
 import logging
-from typing import List, Dict, Any, Optional
 
 import pandas as pd
-import numpy as np
 from tqdm import tqdm
-
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
-from sklearn.multiclass import OneVsRestClassifier
 
 from openai import AsyncOpenAI
 
 # ---------------- CONFIG ----------------
 MODEL_LLM = "gpt-5.1"
-EMBEDDING_MODEL = "text-embedding-3-large"
 
-MAX_CONCURRENCY = 10   # main speed control knob
-EMBED_CONCURRENCY = 20
-
-SAVE_EVERY = 25
+MAX_CONCURRENCY = 10
 MAX_INPUT_CHARS = 12000
 TEMPERATURE = 0
 
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger("rad_nlp")
 
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"), timeout=60)
+client = AsyncOpenAI(
+    api_key=os.getenv("OPENAI_API_KEY"),
+    timeout=60
+)
 
 # ---------------- UTIL ----------------
 def load_schema(path):
@@ -40,25 +32,56 @@ def load_schema(path):
 
 def read_csv(path):
     df = pd.read_csv(path)
+
+    # normalize column names
     df.columns = [c.strip().lower() for c in df.columns]
+
+    # require report_text
     df = df.dropna(subset=["report_text"])
+
+    # ensure string IDs
     df["report_id"] = df["report_id"].astype(str)
+
     return df
 
 def deidentify(text: str) -> str:
-    text = re.sub(r"\b([A-Z][a-z]+\s[A-Z][a-z]+)\b", "[NAME]", text)
-    text = re.sub(r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b", "[DATE]", text)
+    """
+    Basic PHI masking.
+    """
+
+    # names
+    text = re.sub(
+        r"\b([A-Z][a-z]+\s[A-Z][a-z]+)\b",
+        "[NAME]",
+        text
+    )
+
+    # dates
+    text = re.sub(
+        r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b",
+        "[DATE]",
+        text
+    )
+
     return text
 
 def safe_json(text: str):
+    """
+    Safely parse JSON from model output.
+    """
+
     try:
         return json.loads(text)
+
     except:
         m = re.search(r"\{.*\}", text, re.S)
+
         if not m:
             return None
+
         try:
             return json.loads(m.group(0))
+
         except:
             return None
 
@@ -66,19 +89,24 @@ def build_prompt(schema, text):
     return f"""
 You are a strict medical extraction system.
 
+Extract the requested fields from the radiology report.
+
 Schema:
 {json.dumps(schema["fields"], indent=2)}
 
-Report:
+Radiology Report:
 {text}
 
-Return ONLY JSON.
+Return ONLY valid JSON.
 """
 
 # ---------------- GPT CALL ----------------
 async def call_gpt(semaphore, text, schema):
+
     async with semaphore:
+
         text = text[:MAX_INPUT_CHARS]
+
         prompt = build_prompt(schema, text)
 
         try:
@@ -88,51 +116,100 @@ async def call_gpt(semaphore, text, schema):
                 temperature=TEMPERATURE,
                 max_output_tokens=600,
             )
+
             content = resp.output_text
+
         except Exception as e:
+
             logger.error(f"GPT error: {e}")
-            return {k: None for k in schema["fields"]}
+
+            return {
+                k: None for k in schema["fields"]
+            }
 
         parsed = safe_json(content)
+
         if not parsed:
-            return {k: None for k in schema["fields"]}
+            logger.error("Failed to parse JSON.")
+
+            return {
+                k: None for k in schema["fields"]
+            }
 
         return parsed
 
-# ---------------- EMBEDDINGS ----------------
-async def get_embedding(semaphore, text):
-    async with semaphore:
-        try:
-            r = await client.embeddings.create(
-                model=EMBEDDING_MODEL,
-                input=text
-            )
-            return r.data[0].embedding
-        except Exception as e:
-            logger.error(f"Embedding error: {e}")
-            return None
+# ---------------- SAVE ----------------
+def append_csv(records, out_csv):
+
+    rows = []
+
+    for r in records:
+
+        flat = {
+            "report_id": r["report_id"],
+            "report_text": r["report_text"],
+            **r["extraction"]
+        }
+
+        rows.append(flat)
+
+    df_out = pd.DataFrame(rows)
+
+    header = not os.path.exists(out_csv)
+
+    df_out.to_csv(
+        out_csv,
+        mode="a",
+        header=header,
+        index=False,
+        quoting=csv.QUOTE_ALL
+    )
 
 # ---------------- PIPELINE ----------------
-async def run_pipeline(input_csv, schema_path, out_csv, deid):
+async def run_pipeline(
+    input_csv,
+    schema_path,
+    out_csv,
+    deid
+):
 
+    # -------- LOAD DATA --------
     df = read_csv(input_csv)
+
     schema = load_schema(schema_path)
 
-    # resume
+    # -------- RESUME SUPPORT --------
     if os.path.exists(out_csv):
-        done = pd.read_csv(out_csv)["report_id"].astype(str).tolist()
-        df = df[~df["report_id"].isin(done)]
 
-    gpt_sem = asyncio.Semaphore(MAX_CONCURRENCY)
-    emb_sem = asyncio.Semaphore(EMBED_CONCURRENCY)
+        done_ids = pd.read_csv(
+            out_csv
+        )["report_id"].astype(str).tolist()
 
-    results = []
+        df = df[
+            ~df["report_id"].isin(done_ids)
+        ]
 
-    # -------- GPT STAGE --------
+    if len(df) == 0:
+        print("No remaining reports to process.")
+        return
+
+    # -------- ASYNC LIMITER --------
+    semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
+
+    # -------- PROCESSING --------
     async def process_row(row):
-        text = deidentify(row.report_text) if deid else row.report_text
 
-        extraction = await call_gpt(gpt_sem, text, schema)
+        text = (
+            deidentify(row.report_text)
+            if deid
+            else row.report_text
+        )
+
+        extraction = await call_gpt(
+            semaphore,
+            text,
+            schema
+        )
 
         return {
             "report_id": row.report_id,
@@ -140,83 +217,66 @@ async def run_pipeline(input_csv, schema_path, out_csv, deid):
             "extraction": extraction
         }
 
-    tasks = [process_row(row) for _, row in df.iterrows()]
-
-    for f in tqdm(asyncio.as_completed(tasks), total=len(tasks), desc="GPT"):
-        results.append(await f)
-
-    # checkpoint save
-    def append_csv(records):
-        rows = []
-        for r in records:
-            flat = {
-                "report_id": r["report_id"],
-                "report_text": r["report_text"],
-                **r["extraction"]
-            }
-            rows.append(flat)
-
-        df_out = pd.DataFrame(rows)
-        header = not os.path.exists(out_csv)
-        df_out.to_csv(out_csv, mode="a", header=header, index=False, quoting=csv.QUOTE_ALL)
-
-    append_csv(results)
-
-    # -------- EMBEDDINGS --------
-    embed_tasks = [
-        get_embedding(emb_sem, r["report_text"])
-        for r in results
+    tasks = [
+        process_row(row)
+        for _, row in df.iterrows()
     ]
 
-    embeddings = []
-    for f in tqdm(asyncio.as_completed(embed_tasks), total=len(embed_tasks), desc="Embedding"):
-        embeddings.append(await f)
+    results = []
 
-    embeddings = [e for e in embeddings if e is not None]
+    for f in tqdm(
+        asyncio.as_completed(tasks),
+        total=len(tasks),
+        desc="Extracting"
+    ):
+        results.append(await f)
 
-    # -------- ML (unchanged) --------
-    labels = []
-    for r in results:
-        row = {}
-        for k, v in r["extraction"].items():
-            if v is None:
-                row[k] = 0
-            elif isinstance(v, bool):
-                row[k] = int(v)
-            elif isinstance(v, int):
-                row[k] = v
-        labels.append(row)
+    # -------- SAVE RESULTS --------
+    append_csv(results, out_csv)
 
-    if labels:
-        Y = pd.DataFrame(labels).fillna(0).astype(int).clip(0, 1)
-
-        if len(Y) > 1 and len(embeddings) == len(Y):
-            X_tr, X_va, y_tr, y_va = train_test_split(
-                np.array(embeddings),
-                Y.to_numpy(),
-                test_size=0.2,
-                random_state=42
-            )
-
-            clf = OneVsRestClassifier(LogisticRegression(max_iter=2000))
-            clf.fit(X_tr, y_tr)
-            _ = clf.predict(X_va)
+    # -------- DONE --------
+    print("\nExtraction complete.")
+    print(f"Processed reports: {len(results)}")
+    print(f"Saved to: {out_csv}")
 
 # ---------------- CLI ----------------
 if __name__ == "__main__":
+
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input_csv", required=True)
-    parser.add_argument("--schema", required=True)
-    parser.add_argument("--out_csv", default="gpt_output.csv")
-    parser.add_argument("--deid", action="store_true")
+
+    parser.add_argument(
+        "--input_csv",
+        required=True,
+        help="Path to input CSV"
+    )
+
+    parser.add_argument(
+        "--schema",
+        required=True,
+        help="Path to JSON schema"
+    )
+
+    parser.add_argument(
+        "--out_csv",
+        default="gpt_output.csv",
+        help="Output CSV path"
+    )
+
+    parser.add_argument(
+        "--deid",
+        action="store_true",
+        help="Enable de-identification"
+    )
 
     args = parser.parse_args()
 
-    asyncio.run(run_pipeline(
-        args.input_csv,
-        args.schema,
-        args.out_csv,
-        args.deid
-    ))
+    asyncio.run(
+        run_pipeline(
+            args.input_csv,
+            args.schema,
+            args.out_csv,
+            args.deid
+        )
+    )
